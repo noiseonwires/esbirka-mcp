@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "esbirka-law-provisions": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/src/ESbirka.Mcp/ESbirka.Mcp.csproj",
+        "--no-build",
+        "--no-launch-profile"
+      ]
+    }
+  }
+}

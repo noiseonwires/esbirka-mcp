@@ -1,0 +1,12 @@
+services:
+  esbirka-mcp:
+    build: .
+    image: esbirka-mcp:local
+    init: true
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - esbirka-cache:/data
+
+volumes:
+  esbirka-cache:
