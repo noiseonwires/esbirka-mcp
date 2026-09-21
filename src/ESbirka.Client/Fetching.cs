@@ -140,7 +140,7 @@ public sealed class ESbirkaRequestCoordinator : IDisposable
 
 internal static class ESbirkaMetrics
 {
-    private static readonly Meter Meter = new("ESbirka.Client", "0.1.0");
+    private static readonly Meter Meter = new("ESbirka.Client", "0.1.1");
     internal static readonly Counter<long> RemoteRequests = Meter.CreateCounter<long>("esbirka.remote.requests");
     internal static readonly Counter<long> RemoteBytes = Meter.CreateCounter<long>("esbirka.remote.bytes");
     internal static readonly Counter<long> CacheReads = Meter.CreateCounter<long>("esbirka.cache.reads");

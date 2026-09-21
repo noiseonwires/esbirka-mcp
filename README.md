@@ -120,6 +120,42 @@ Custom `IESbirkaContentFetcher` implementations must implement `PostJsonAsync` t
 
 For DI, register a host-supplied `IESbirkaContentFetcher`, then call `AddESbirkaClient(options => ...)`. The client is scoped, while the cache and request coordinator are shared singletons. The standalone MCP host promotes its client to singleton to reuse its bounded in-memory indexes across calls. Share one coordinator per upstream host when constructing multiple clients manually.
 
+## GitHub Packages
+
+`dotnet pack` only creates a local `.nupkg`; it does not publish to a registry. The **Build And Test** workflow uploads the Ubuntu test job's package as an Actions artifact named `ESbirka.Client`. Download it from the workflow run's **Artifacts** section after that job succeeds.
+
+Publishing to the private NuGet registry is a separate job, gated on the Windows and Linux tests. Normal pushes and pull requests do not publish. After these workflow changes reach the default branch, choose either:
+
+1. Open **Actions > Build And Test > Run workflow**, select the default branch, enable **Publish ESbirka.Client to GitHub Packages after verification**, and run it.
+2. Publish a GitHub release from a commit containing this workflow. Use a tag matching the package version, such as `v0.1.1`.
+
+The package version comes from `<Version>` in `src/ESbirka.Client/ESbirka.Client.csproj`, currently `0.1.1`; release tags do not automatically change it. Increment this property before publishing changed code as a new version. Re-running a publication skips existing versions rather than replacing them. A failed verification job prevents publication; inspect the run's jobs if no package appears.
+
+The publishing job uses the ephemeral `GITHUB_TOKEN` with `packages: write`; no PAT or new repository secret is required. NuGet source credentials are supplied through a job environment variable, not committed to configuration. The package's `RepositoryUrl` links it to `noiseonwires/esbirka-mcp`. New GitHub Packages packages are private by default.
+
+After the first successful publication, `ESbirka.Client` will appear in the repository's **Packages** section and can be restored from:
+
+```text
+https://nuget.pkg.github.com/noiseonwires/index.json
+```
+
+To let another repository's GitHub Actions restore it, open the package's **Package settings > Manage Actions access**, add that repository with **Read** access, and give its workflow `packages: read`. Authenticate its NuGet source using its own `GITHUB_TOKEN`. Local authenticated restores generally require a classic PAT with `read:packages` from an account permitted to access the private package. Never commit tokens; use CI environment variables for credentials.
+
+## Storage And Fetching
+
+- Resolve metadata first, then fetch every page using the canonical dated path. `%2F` remains encoded inside one path segment.
+- Preserve ordered fragments, unknown types/fields, references and raw XHTML. Hierarchy uses one depth stack across all pages; legal addresses use semantic ELI suffixes, never durable numeric IDs.
+- Persist compressed, SHA-256-checked raw metadata and pages as a complete SQLite snapshot. Snapshot and alias writes share one transaction. Incomplete or inconsistent downloads are never published.
+- Keep parsed indexes in a size-bounded in-memory cache, keyed by parser version and payload hash. Rebuild from raw pages after a parser change without fetching upstream. Rendering is intentionally not persisted.
+- Coalesce misses per document, serialize upstream activity through a shared coordinator, and apply request delay, cancellation, size/page limits, and bounded retries with backoff/jitter.
+- Keep old canonical snapshots after alias movement. Quota eviction removes least-recently-used historical snapshots first, preserving current pointers and snapshots in the active write transaction. If active snapshots exhaust the quota, writes fail atomically with `cache_full`.
+- Cache only confirmed provision misses, briefly and in memory; never cache transport errors. No negative law cache is used.
+- The quota measures compressed payload bytes, not SQLite file allocation. SQLite reuses freed pages; physical file compaction is an offline maintenance concern.
+
+The standalone host uses `HttpContentFetcher` and supports an optional proxy. Set `Transport__UserAgent` to override the User-Agent for all upstream GET and search POST requests, for example `MyLegalClient/1.0 (+https://example.com/contact)`. The value must be a nonblank, valid HTTP User-Agent header. Library consumers can use `new HttpContentFetcher(http) { UserAgent = "MyLegalClient/1.0" }`. It does not disable certificate verification or web security.
+
+Use a single MCP process per cache database. Multiple independent caches/processes do not coordinate upstream rates. Distributed caching, job-pinning APIs, scheduled effective-date sweeps, background stale-while-revalidate, and comparisons/diffs are future extensions. Refresh is synchronous and explicit in this implementation.
+
 ## Configuration
 
 Standard .NET configuration applies: environment variables override optional `appsettings.json` in the process working directory. Use double underscores for nesting. No credentials are required by e-Sbirka.

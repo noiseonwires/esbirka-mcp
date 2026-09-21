@@ -123,7 +123,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v4
         with:
           name: ESbirka.Client
           path: artifacts
@@ -136,65 +136,3 @@ jobs:
           dotnet nuget add source "$PACKAGE_SOURCE" --name github
           dotnet nuget push "artifacts/*.nupkg" --source github --api-key "$NUGET_AUTH_TOKEN" --skip-duplicate
         shell: bash
-
-  release-assets:
-    needs: [test, binary-packages, container]
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-      - name: Build release packages
-        run: |
-          dotnet pack src/ESbirka.Client/ESbirka.Client.csproj -c Release -o artifacts
-          for rid in linux-x64 linux-arm64 win-x64 win-arm64; do
-            dotnet publish src/ESbirka.Mcp/ESbirka.Mcp.csproj \
-              -c Release -r "$rid" --self-contained true \
-              -p:PublishSingleFile=true -o "artifacts/$rid"
-          done
-          tar -czf artifacts/ESbirka.Mcp-linux-x64.tar.gz -C artifacts/linux-x64 .
-          tar -czf artifacts/ESbirka.Mcp-linux-arm64.tar.gz -C artifacts/linux-arm64 .
-          (cd artifacts/win-x64 && zip -qr ../ESbirka.Mcp-win-x64.zip .)
-          (cd artifacts/win-arm64 && zip -qr ../ESbirka.Mcp-win-arm64.zip .)
-      - name: Attach packages to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release upload "${{ github.event.release.tag_name }}"
-          artifacts/*.nupkg artifacts/*.tar.gz artifacts/*.zip --clobber
-
-  publish-container:
-    needs: [test, container]
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - id: metadata
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}

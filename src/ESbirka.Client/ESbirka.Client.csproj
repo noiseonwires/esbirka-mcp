@@ -2,7 +2,7 @@
   <PropertyGroup>
     <Description>Structured, version-aware e-Sbirka legal document client.</Description>
     <PackageId>ESbirka.Client</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <RepositoryUrl>https://github.com/noiseonwires/esbirka-mcp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>

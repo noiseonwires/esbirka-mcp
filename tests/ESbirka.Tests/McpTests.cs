@@ -82,6 +82,9 @@ public sealed class McpTests
     public async Task StdioServerNegotiatesSchemasAndReturnsToolErrorsWithoutStdoutNoise()
     {
         var directory = Path.Combine(Path.GetTempPath(), "esbirka-mcp-test-" + Guid.NewGuid().ToString("N"));
+        using var conflictingListener = new TcpListener(IPAddress.Loopback, 0);
+        conflictingListener.Start();
+        var conflictingPort = ((IPEndPoint)conflictingListener.LocalEndpoint).Port;
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -92,7 +95,8 @@ public sealed class McpTests
                 Arguments = [typeof(LawTools).Assembly.Location],
                 EnvironmentVariables = new Dictionary<string, string?>
                 {
-                    ["ESbirka__CachePath"] = Path.Combine(directory, "cache.db")
+                    ["ESbirka__CachePath"] = Path.Combine(directory, "cache.db"),
+                    ["ASPNETCORE_URLS"] = $"http://127.0.0.1:{conflictingPort}"
                 }
             });
             await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
